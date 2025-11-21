@@ -29,8 +29,9 @@ services:
       - .:/sim_ws/src/vikavolt_gym_ros
     environment:
       - DISPLAY=novnc:0.0
-    networks:
-      - x11
+    network_mode: "host"
+#    networks:
+#      - x11
     stdin_open: true
     tty: true 
   #novnc:  
