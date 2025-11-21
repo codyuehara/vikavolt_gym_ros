@@ -26,33 +26,26 @@ class GymBridge(Node):
         self.declare_parameter('ego_odom_topic')
         self.declare_parameter('ego_drive_topic')
         self.declare_parameter('collision_topic')
-        self.declare_parameter('map_path')
-        self.declare_parameter('num_agent')
-        self.declare_parameter('mass')
-        self.declare_parameter('starting_x')
-        self.declare_parameter('starting_y')
-        self.declare_parameter('starting_z')
-        self.declare_parameter('kb_teleop')
-        self.declare_parameter('gate_1_position')
+        self.declare_parameter('map_path', "")
+        self.declare_parameter('num_agent', 1)
+        self.declare_parameter('dt', 0.01)
+        self.declare_parameter('mass', 1.0)
+        self.declare_parameter('starting_position', [0.0, 0.0, 0.0])
+        self.declare_parameter('starting_orientation', [0.0, 0.0, 0.0, 1.0])
+        self.declare_parameter('kb_teleop', True)
+        self.declare_parameter('gate_1_position', [5.0, 0.0, 1.0])
         self.declare_parameter('gate_1_orientation')
-        self.declare_parameter('gate_2_position')
+        self.declare_parameter('gate_2_position', [10.0, 0.0, 2.0])
         self.declare_parameter('gate_2_orientation')
-        self.declare_parameter('gate_3_position')
+        self.declare_parameter('gate_3_position', [15.0, 3.0, 5.0])
         self.declare_parameter('gate_3_orientation')
 
-        # check num_agents
-        num_agents = self.get_parameter('num_agent').value
-        if num_agents < 1 or num_agents > 2:
-            raise ValueError('num_agents should be either 1 or 2.')
-        elif type(num_agents) != int:
-            raise ValueError('num_agents should be an int.')
-
+        dt = self.get_parameter('dt').value
         mass = self.get_parameter('mass').value
-        sx = self.get_parameter('starting_x').value
-        sy = self.get_parameter('starting_y').value
-        sz = self.get_parameter('starting_z').value
-        init_position = np.array([sx, sy, sz])
-        #self.velocity = [0.0, 0.0, 0.0]
+        #init_position = np.array([sx, sy, sz])
+        start_pos = self.get_parameter(f'starting_position').get_parameter_value().double_array_value
+        init_position = np.array(start_pos, dtype=float)
+        init_orientation = self.get_parameter(f'starting_orientation').get_parameter_value().double_array_value
         self.collision_flag = False
  
         self.gate_positions = []
@@ -63,7 +56,7 @@ class GymBridge(Node):
             #orientations.append(quat)
         self.get_logger().info(f"Gates loaded: {self.gate_positions}")
         # env backend
-        self.env = gym.make("gymnasium_env/Vikavolt-v0", mass=mass, init_position=init_position, gate_positions=self.gate_positions)     
+        self.env = gym.make("gymnasium_env/Vikavolt-v0", mass=mass, init_position=init_position, gate_positions=self.gate_positions, dt=dt)     
 
         self.has_opp = False
         self.obs, info = self.env.reset(seed=42)
@@ -145,11 +138,8 @@ class GymBridge(Node):
             self.ego_steer = 0.0
 
     def drive_timer_callback(self):
-        #action = [1,2,3,4]
         action = np.array([10,10,10,10])
         self.obs, reward, terminated, truncated, info = self.env.step(action)
-        #elif self.ego_drive_published and self.has_opp and self.opp_drive_published:
-        #    self.obs, _, self.done, _ = self.env.step(np.array([[self.ego_steer, self.ego_requested_speed], [self.opp_steer, self.opp_requested_speed]]))
         self._update_sim_state()
 
     def timer_callback(self):
@@ -158,22 +148,15 @@ class GymBridge(Node):
 
         # pub tf
         self._publish_odom(ts)
-  #      self._publish_transforms(ts)
-  #      self._publish_laser_transforms(ts)
-  #      self._publish_wheel_transforms(ts)
 
     def _update_sim_state(self):
-   #     self.ego_scan = list(self.obs['scans'][0])
-
-        #self.position[0] = self.obs['poses_x'][0]
-        #self.position[1] = self.obs['poses_y'][0]
-        #self.get_logger().info(f"OBS TYPE: {type(self.obs)}")
-        #self.get_logger().info(f"OBS: {self.obs}")
         self.position = self.obs['pos']
         self.get_logger().info(f"position : {self.position}")
         self.velocity = self.obs['vel']
-        #self.velocity[1] = self.obs['linear_vels_y'][0]
-        #self.velocity[2] = self.obs['ang_vels_z'][0]
+        self.R = self.obs['R']
+        self.prev_action = self.obs['prev_action']
+        self.get_logger().info(f"R : {self.R}")
+        self.get_logger().info(f"prev_action : {self.prev_action}")
         
 
     def _publish_odom(self, ts):

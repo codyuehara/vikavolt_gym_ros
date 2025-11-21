@@ -12,20 +12,20 @@ bridge:
     # opponent parameters
     num_agent: 1
 
+    dt: 0.002
     mass: 1.0
 
     # ego starting pose on map
-    starting_x: 10.0
-    starting_y: 10.0
-    starting_z: 5.0
+    starting_position: [5.0, 5.0, 1.0]
+    starting_orientation: [0.0, 0.0, 0.0, 1.0]
 
-    gate_1_position: [1.0, 2.0, 0.5]
+    gate_1_position: [1.0, 2.0, 5.0]
     gate_1_orientation: [0.0, 0.0, 0.0, 1.0]
 
     gate_2_position: [3.0, 5.0, 1.0]
     gate_2_orientation: [0.0, 0.707, 0.0, 0.707]
 
-    gate_3_position: [6.0, 5.0, 1.5]
+    gate_3_position: [6.0, 5.0, 1.0]
     gate_3_orientation: [0.0, 0.0, 0.707, 0.707]
 
     # teleop
