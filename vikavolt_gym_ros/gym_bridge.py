@@ -1,5 +1,6 @@
 import rclpy
 from rclpy.node import Node
+from rclpy.executors import MultiThreadedExecutor
 
 from std_msgs.msg import Bool
 from std_msgs.msg import String
@@ -65,7 +66,7 @@ class GymBridge(Node):
         collision_topic = self.get_parameter('collision_topic').value
 
         # sim physical step timer
-        self.drive_timer = self.create_timer(1, self.drive_timer_callback)
+        self.sim_timer = self.create_timer(0.2, self.sim_timer_callback)
         # topic publishing timer
         self.timer = self.create_timer(1, self.timer_callback)
 
@@ -137,26 +138,32 @@ class GymBridge(Node):
         else:
             self.ego_steer = 0.0
 
-    def drive_timer_callback(self):
-        action = np.array([10,10,10,10])
-        self.obs, reward, terminated, truncated, info = self.env.step(action)
-        self._update_sim_state()
+    def sim_timer_callback(self):
+        try:
+            action = np.array([0,0,0,0])
+            self.obs, reward, terminated, truncated, info = self.env.step(action)
+            self._update_sim_state()
+        except Exception as e:
+            self.get_logger().error(f"Exception in sim_timer_callback: {e}")
 
     def timer_callback(self):
-        ts = self.get_clock().now().to_msg()
-        self.get_logger().info(f"timer called : {ts}")
+        try:
+            ts = self.get_clock().now().to_msg()
+            self.get_logger().info(f"timer called : {ts}")
+            self.get_logger().info(f"position : {self.position}")
+            self.get_logger().info(f"R : {self.R}")
+            self.get_logger().info(f"prev_action : {self.prev_action}")
+            # pub tf
+            self._publish_odom(ts)
+        except Exception as e:
+            self.get_logger().error(f"Exception in timer_callback: {e}")
 
-        # pub tf
-        self._publish_odom(ts)
 
     def _update_sim_state(self):
         self.position = self.obs['pos']
-        self.get_logger().info(f"position : {self.position}")
         self.velocity = self.obs['vel']
         self.R = self.obs['R']
         self.prev_action = self.obs['prev_action']
-        self.get_logger().info(f"R : {self.R}")
-        self.get_logger().info(f"prev_action : {self.prev_action}")
         
 
     def _publish_odom(self, ts):
@@ -181,7 +188,14 @@ class GymBridge(Node):
 def main(args=None):
     rclpy.init(args=args)
     gym_bridge = GymBridge()
-    rclpy.spin(gym_bridge)
+    executor = MultiThreadedExecutor()
+    executor.add_node(gym_bridge)
+    try:
+        executor.spin()
+    finally:
+        executor.shutdown()
+        gym_bridge.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
