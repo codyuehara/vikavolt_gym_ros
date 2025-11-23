@@ -69,6 +69,7 @@ class GymBridge(Node):
         self.sim_timer = self.create_timer(0.2, self.sim_timer_callback)
         # topic publishing timer
         self.timer = self.create_timer(1, self.timer_callback)
+        self.action = np.zeros(4)
 
         # transform broadcaster
         #self.br = TransformBroadcaster(self)
@@ -102,7 +103,7 @@ class GymBridge(Node):
         if self.get_parameter('kb_teleop').value:
             self.teleop_sub = self.create_subscription(
                 Twist,
-                '/cmd_vel',
+                '/cmd',
                 self.teleop_callback,
                 10)
 
@@ -126,22 +127,15 @@ class GymBridge(Node):
         _, _, rtheta = euler.quat2euler([rqw, rqx, rqy, rqz], axes='sxyz')
 
     def teleop_callback(self, twist_msg):
-        if not self.ego_drive_published:
-            self.ego_drive_published = True
-
-        self.ego_requested_speed = twist_msg.linear.x
-
-        if twist_msg.angular.z > 0.0:
-            self.ego_steer = 0.3
-        elif twist_msg.angular.z < 0.0:
-            self.ego_steer = -0.3
-        else:
-            self.ego_steer = 0.0
+        thrust = twist_msg.linear.z
+        pitch = twist_msg.angular.x
+        roll = twist_msg.angular.y
+        yaw = twist_msg.angular.z
+        self.action = np.array([thrust, pitch, roll, yaw])
 
     def sim_timer_callback(self):
         try:
-            action = np.array([0,0,0,0])
-            self.obs, reward, terminated, truncated, info = self.env.step(action)
+            self.obs, reward, terminated, truncated, info = self.env.step(self.action)
             self._update_sim_state()
         except Exception as e:
             self.get_logger().error(f"Exception in sim_timer_callback: {e}")
